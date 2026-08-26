@@ -34,6 +34,10 @@ browser.runtime.onStartup.addListener(() => void syncRegistrations());
 // y en cuanto se concede el permiso, registrar lo que hubiera pendiente
 browser.permissions.onAdded.addListener(() => void syncRegistrations());
 
+// el botón de la barra abre y cierra el panel. toggle() exige un gesto de usuario:
+// hay que llamarlo síncronamente dentro del handler, sin await previo, o firefox lo rechaza
+browser.action.onClicked.addListener(() => void browser.sidebarAction.toggle());
+
 browser.runtime.onConnect.addListener((sidebar) => {
 	const post = (message: BackgroundToSidebar): void => sidebar.postMessage(message);
 	const pushState = async (): Promise<void> => post({ type: 'ui:state', state: await buildState() });

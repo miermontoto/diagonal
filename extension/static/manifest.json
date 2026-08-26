@@ -16,6 +16,10 @@
 	"background": {
 		"scripts": ["background.js"]
 	},
+	"action": {
+		"default_title": "__MSG_extName__",
+		"default_icon": "icons/diagonal.svg"
+	},
 	"sidebar_action": {
 		"default_title": "__MSG_extName__",
 		"default_panel": "sidebar/sidebar.html",
