@@ -1,0 +1,17 @@
+{
+	"name": "@diagonal/extension",
+	"private": true,
+	"version": "0.1.0",
+	"type": "module",
+	"scripts": {
+		"build": "tsc --noEmit && node esbuild.mjs",
+		"typecheck": "tsc --noEmit"
+	},
+	"dependencies": {
+		"@diagonal/shared": "workspace:*"
+	},
+	"devDependencies": {
+		"@types/firefox-webext-browser": "^120.0.0",
+		"esbuild": "^0.25.0"
+	}
+}

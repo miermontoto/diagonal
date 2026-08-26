@@ -1,0 +1,21 @@
+{
+	"extName": { "message": "diagonal" },
+	"extDescription": { "message": "Genera userscripts mediante prompts, impulsado por Claude Code" },
+	"sidebarTitle": { "message": "diagonal" },
+	"statusConnecting": { "message": "conectando con el host…" },
+	"statusReady": { "message": "listo" },
+	"statusHostMissing": { "message": "host nativo no disponible" },
+	"statusAuthMissing": { "message": "no se encontró sesión de suscripción de Claude" },
+	"grantIntro": { "message": "diagonal necesita dos permisos, concedidos de uno en uno: gestionar userscripts y acceder a los sitios." },
+	"grantUserScripts": { "message": "1/2 · Permitir userscripts" },
+	"grantOrigins": { "message": "2/2 · Permitir acceso a los sitios" },
+	"promptPlaceholder": { "message": "Describe qué debería hacer esta página…" },
+	"send": { "message": "Generar" },
+	"generating": { "message": "generando…" },
+	"proposalTitle": { "message": "Revisar script generado" },
+	"approve": { "message": "Aprobar y activar" },
+	"discard": { "message": "Descartar" },
+	"scriptsTitle": { "message": "Scripts" },
+	"emptyScripts": { "message": "Aún no hay scripts." },
+	"delete": { "message": "Eliminar" }
+}

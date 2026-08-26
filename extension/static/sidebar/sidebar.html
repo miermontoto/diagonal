@@ -1,0 +1,46 @@
+<!doctype html>
+<html>
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<title>diagonal</title>
+	<link rel="stylesheet" href="sidebar.css" />
+</head>
+<body>
+	<header>
+		<span id="status-dot" class="dot"></span>
+		<h1 data-i18n="sidebarTitle"></h1>
+		<span id="status-text"></span>
+	</header>
+
+	<section id="onboarding" hidden>
+		<p data-i18n="grantIntro"></p>
+		<button id="grant"></button>
+	</section>
+
+	<main id="chat"></main>
+
+	<section id="proposal" hidden>
+		<h2 data-i18n="proposalTitle"></h2>
+		<div id="proposal-name"></div>
+		<pre id="proposal-code"></pre>
+		<div class="row">
+			<button id="approve" data-i18n="approve"></button>
+			<button id="discard" class="secondary" data-i18n="discard"></button>
+		</div>
+	</section>
+
+	<section id="scripts-section">
+		<h2 data-i18n="scriptsTitle"></h2>
+		<ul id="scripts"></ul>
+		<p id="empty" data-i18n="emptyScripts"></p>
+	</section>
+
+	<form id="prompt-form">
+		<textarea id="prompt" rows="3"></textarea>
+		<button id="send" type="submit" data-i18n="send"></button>
+	</form>
+
+	<script src="sidebar.js"></script>
+</body>
+</html>

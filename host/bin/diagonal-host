@@ -1,0 +1,2 @@
+#!/bin/sh
+exec "/home/mier/.local/share/fnm/node-versions/v22.22.3/installation/bin/node" "/home/mier/dev/diagonal/host/dist/index.js"

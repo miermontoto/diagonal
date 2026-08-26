@@ -1,0 +1,28 @@
+{
+	"manifest_version": 3,
+	"name": "__MSG_extName__",
+	"description": "__MSG_extDescription__",
+	"version": "0.1.0",
+	"default_locale": "en",
+	"browser_specific_settings": {
+		"gecko": {
+			"id": "diagonal@mier.info",
+			"strict_min_version": "136.0"
+		}
+	},
+	"permissions": ["nativeMessaging", "storage", "scripting", "tabs"],
+	"optional_permissions": ["userScripts"],
+	"optional_host_permissions": ["<all_urls>"],
+	"background": {
+		"scripts": ["background.js"]
+	},
+	"sidebar_action": {
+		"default_title": "__MSG_extName__",
+		"default_panel": "sidebar/sidebar.html",
+		"default_icon": "icons/diagonal.svg"
+	},
+	"icons": {
+		"48": "icons/diagonal.svg",
+		"96": "icons/diagonal.svg"
+	}
+}

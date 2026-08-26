@@ -1,0 +1,21 @@
+{
+	"extName": { "message": "diagonal" },
+	"extDescription": { "message": "Generate userscripts by prompting, powered by Claude Code" },
+	"sidebarTitle": { "message": "diagonal" },
+	"statusConnecting": { "message": "connecting to host…" },
+	"statusReady": { "message": "ready" },
+	"statusHostMissing": { "message": "native host unavailable" },
+	"statusAuthMissing": { "message": "no Claude subscription login found" },
+	"grantIntro": { "message": "diagonal needs two permissions, granted one at a time: managing userscripts and accessing sites." },
+	"grantUserScripts": { "message": "1/2 · Allow userscripts" },
+	"grantOrigins": { "message": "2/2 · Allow site access" },
+	"promptPlaceholder": { "message": "Describe what this page should do…" },
+	"send": { "message": "Generate" },
+	"generating": { "message": "generating…" },
+	"proposalTitle": { "message": "Review generated script" },
+	"approve": { "message": "Approve and enable" },
+	"discard": { "message": "Discard" },
+	"scriptsTitle": { "message": "Scripts" },
+	"emptyScripts": { "message": "No scripts yet." },
+	"delete": { "message": "Delete" }
+}

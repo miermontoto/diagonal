@@ -1,0 +1,16 @@
+{
+	"name": "@diagonal/shared",
+	"private": true,
+	"version": "0.1.0",
+	"type": "module",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"default": "./dist/index.js"
+		}
+	},
+	"scripts": {
+		"build": "tsc",
+		"typecheck": "tsc --noEmit"
+	}
+}
