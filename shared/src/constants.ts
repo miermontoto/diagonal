@@ -26,3 +26,20 @@ export const BILLING_ENV_BLOCKLIST: readonly string[] = [
 
 // tope del resumen de dom que se envía como contexto al modelo
 export const MAX_DOM_DIGEST_CHARS = 4000;
+
+// historial de fallos por script: suficiente para ver un patrón, no tanto como
+// para inflar el prompt de diagnóstico
+export const MAX_DIAGNOSTICS_PER_SCRIPT = 5;
+
+// instantánea de dom que acompaña al diagnóstico, más rica que el digest
+export const MAX_DOM_SNAPSHOT_CHARS = 12000;
+
+// la captura se reescala y recomprime hasta caber: base64 infla un 33%, así que
+// el presupuesto en bytes se fija bien por debajo del límite de trama
+export const SCREENSHOT_MAX_WIDTH = 1024;
+export const SCREENSHOT_QUALITIES: readonly number[] = [0.6, 0.45, 0.3];
+export const MAX_SCREENSHOT_BYTES = 512 * 1024;
+
+// segunda pasada del autochequeo: los efectos que dependen de MutationObserver
+// no están aplicados todavía en document_idle
+export const VERIFY_RECHECK_MS = 1500;

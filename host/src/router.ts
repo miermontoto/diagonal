@@ -1,6 +1,6 @@
 import { PROTOCOL_VERSION } from '@diagonal/shared';
 import type { HostEvent, HostRequest } from '@diagonal/shared';
-import { authState, generateScript, refineScript } from './claude.js';
+import { authState, checkSyntax, generateScript, refineScript } from './claude.js';
 import { deleteScript, listScripts, saveScript, scriptsDir } from './store.js';
 
 // despacha cada petición y emite sus eventos; el error handling vive aquí para
@@ -14,6 +14,9 @@ export const handleRequest = async (request: HostRequest, emit: (event: HostEven
 				return;
 			case 'list':
 				emit({ id, type: 'list', scripts: listScripts() });
+				return;
+			case 'check':
+				emit({ id, type: 'check', ...checkSyntax(request.code) });
 				return;
 			case 'save':
 				saveScript(request.script);
@@ -31,8 +34,13 @@ export const handleRequest = async (request: HostRequest, emit: (event: HostEven
 				return;
 			}
 			case 'refine': {
-				const script = await refineScript(request.script, request.prompt, request.context, (text) =>
-					emit({ id, type: 'chunk', text }),
+				const script = await refineScript(
+					request.script,
+					request.prompt,
+					request.context,
+					(text) => emit({ id, type: 'chunk', text }),
+					request.diagnostics,
+					request.evidence,
 				);
 				emit({ id, type: 'script', script });
 				return;

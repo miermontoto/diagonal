@@ -1,4 +1,4 @@
-import { matchesUrl, type DiagonalScript } from '@diagonal/shared';
+import { matchesUrl, type DiagonalScript, type ScriptDiagnostic } from '@diagonal/shared';
 import type { BackgroundToSidebar, SidebarToBackground, UiState } from '../messages';
 
 const t = (key: string): string => browser.i18n.getMessage(key);
@@ -18,9 +18,11 @@ const detailSection = $('detail');
 const detailTitle = $('detail-title');
 const detailName = $('detail-name');
 const detailCode = $<HTMLTextAreaElement>('detail-code');
+const detailIssues = $<HTMLUListElement>('detail-issues');
 const approveButton = $<HTMLButtonElement>('approve');
 const discardButton = $<HTMLButtonElement>('discard');
 const saveButton = $<HTMLButtonElement>('save');
+const diagnoseButton = $<HTMLButtonElement>('diagnose');
 const closeButton = $<HTMLButtonElement>('close');
 const scriptsList = $<HTMLUListElement>('scripts');
 const scriptsCount = $('scripts-count');
@@ -41,7 +43,14 @@ type Detail = { script: DiagonalScript; mode: 'proposal' | 'edit' };
 let detail: Detail | undefined;
 // último listado recibido y url de la pestaña activa: juntos deciden qué se pinta
 let allScripts: DiagonalScript[] = [];
+let allDiagnostics: ScriptDiagnostic[] = [];
 let currentUrl = '';
+
+const issuesOf = (scriptId: string): ScriptDiagnostic[] => allDiagnostics.filter((d) => d.scriptId === scriptId);
+
+// el tipo se traduce; el mensaje no, porque es evidencia técnica que además
+// viaja tal cual al modelo
+const kindLabel = (kind: ScriptDiagnostic['kind']): string => t(`kind${kind.charAt(0).toUpperCase()}${kind.slice(1)}`);
 // burbuja en curso donde se acumula el streaming de la generación
 let streamBubble: HTMLElement | undefined;
 
@@ -54,14 +63,35 @@ const addBubble = (kind: 'user' | 'model' | 'error', text: string): HTMLElement 
 	return bubble;
 };
 
+// los fallos solo se listan al editar: en una propuesta aún no hay nada observado
+const renderIssues = (): void => {
+	const issues = detail?.mode === 'edit' ? issuesOf(detail.script.id) : [];
+	detailIssues.hidden = issues.length === 0;
+	detailIssues.replaceChildren(
+		...issues.map((issue) => {
+			const item = document.createElement('li');
+			const kind = document.createElement('span');
+			kind.className = 'kind';
+			kind.textContent = `[${kindLabel(issue.kind)}]`;
+			const text = document.createElement('span');
+			// el mensaje no se traduce: es evidencia técnica, y viaja igual al modelo
+			text.textContent = issue.line !== undefined ? `${issue.message} (:${issue.line})` : issue.message;
+			item.append(kind, text);
+			return item;
+		}),
+	);
+};
+
 const openDetail = (script: DiagonalScript, mode: Detail['mode']): void => {
 	detail = { script, mode };
 	detailTitle.textContent = t(mode === 'proposal' ? 'proposalTitle' : 'editTitle');
 	detailName.textContent = script.name;
 	detailCode.value = script.code;
+	renderIssues();
 	approveButton.hidden = mode !== 'proposal';
 	discardButton.hidden = mode !== 'proposal';
 	saveButton.hidden = mode !== 'edit';
+	diagnoseButton.hidden = mode !== 'edit';
 	closeButton.hidden = mode !== 'edit';
 	detailSection.hidden = false;
 	// con un script abierto, el prompt reformula ese script en vez de crear otro
@@ -94,12 +124,18 @@ const renderScripts = (): void => {
 			name.title = script.description;
 			name.addEventListener('click', () => openDetail(script, 'edit'));
 
+			const issues = issuesOf(script.id);
+			const broken = document.createElement('span');
+			broken.className = 'broken';
+			broken.textContent = issues.length > 0 ? '!' : '';
+			broken.title = issues.map((issue) => `[${kindLabel(issue.kind)}] ${issue.message}`).join('\n');
+
 			const remove = document.createElement('button');
 			remove.className = 'danger';
 			remove.textContent = t('delete');
 			remove.addEventListener('click', () => send({ type: 'ui:delete', scriptId: script.id }));
 
-			item.append(toggle, name, remove);
+			item.append(toggle, name, broken, remove);
 			return item;
 		}),
 	);
@@ -134,7 +170,11 @@ const renderState = (state: UiState): void => {
 	statusDot.className = `dot ${state.host === 'ready' && state.auth !== 'missing' ? 'ready' : 'error'}`;
 
 	allScripts = state.scripts;
+	allDiagnostics = state.diagnostics;
 	renderScripts();
+	// el detalle abierto puede estar mirando un script que acaba de fallar; se
+	// repinta solo la lista de fallos para no tocar lo que se esté escribiendo
+	renderIssues();
 };
 
 port.onMessage.addListener((raw) => {
@@ -187,6 +227,15 @@ saveButton.addEventListener('click', () => {
 	if (detail?.mode !== 'edit') return;
 	send({ type: 'ui:save', scriptId: detail.script.id, code: detailCode.value });
 	closeDetail();
+});
+
+// arreglar: manda los fallos observados y lo que se ve de la página, y el
+// resultado vuelve como propuesta a revisar igual que cualquier otra
+diagnoseButton.addEventListener('click', () => {
+	if (detail?.mode !== 'edit') return;
+	addBubble('user', t('diagnose'));
+	streamBubble = addBubble('model', '');
+	send({ type: 'ui:diagnose', scriptId: detail.script.id });
 });
 
 closeButton.addEventListener('click', () => closeDetail());

@@ -1,8 +1,10 @@
-import type { AuthState, DiagonalScript } from '@diagonal/shared';
+import type { AuthState, DiagonalScript, ScriptDiagnostic } from '@diagonal/shared';
 
 // estado agregado que el background empuja a la sidebar tras cada cambio
 export interface UiState {
 	scripts: DiagonalScript[];
+	// por qué falla cada script; la sidebar los agrupa por scriptId
+	diagnostics: ScriptDiagnostic[];
 	host: 'connecting' | 'ready' | 'missing';
 	auth: AuthState;
 	busy: boolean;
@@ -16,6 +18,8 @@ export type SidebarToBackground =
 	| { type: 'ui:refine'; scriptId: string; prompt: string; code: string }
 	// edición a mano del código desde el panel de detalle
 	| { type: 'ui:save'; scriptId: string; code: string }
+	// reprompt de arreglo: lleva los fallos observados y lo que se ve de la página
+	| { type: 'ui:diagnose'; scriptId: string }
 	// approve lleva code porque la propuesta también es editable antes de aceptarla
 	| { type: 'ui:approve'; scriptId: string; code: string }
 	| { type: 'ui:discard'; scriptId: string }

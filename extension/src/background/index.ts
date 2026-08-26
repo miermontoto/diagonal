@@ -1,9 +1,18 @@
-import { applyCode } from '@diagonal/shared';
-import type { DiagonalScript, HostRequest, PageContext } from '@diagonal/shared';
+import { applyCode, matchesUrl } from '@diagonal/shared';
+import type { DiagonalScript, HostRequest, PageContext, ScriptDiagnostic } from '@diagonal/shared';
 import type { BackgroundToSidebar, SidebarToBackground, UiState } from '../messages';
-import { captureContext } from './capture';
+import { captureContext, captureEvidence } from './capture';
+import { listenForScriptReports } from './diagnostics';
 import { onDisconnect, request, requestOne } from './native';
-import { loadScripts, saveScripts, syncRegistrations } from './registry';
+import {
+	clearDiagnostics,
+	loadDiagnostics,
+	loadRuns,
+	loadScripts,
+	recordDiagnostic,
+	saveScripts,
+	syncRegistrations,
+} from './registry';
 
 let hostState: UiState['host'] = 'connecting';
 let auth: UiState['auth'] = 'unknown';
@@ -13,10 +22,45 @@ let pending: DiagonalScript | undefined;
 
 const buildState = async (): Promise<UiState> => ({
 	scripts: await loadScripts(),
+	diagnostics: await loadDiagnostics(),
 	host: hostState,
 	auth,
 	busy,
 });
+
+// las sidebars abiertas, para empujarles estado cuando el cambio no nace de ellas:
+// un script que falla en una pestaña cualquiera, por ejemplo
+const subscribers = new Set<() => Promise<void>>();
+const notify = (): void => subscribers.forEach((push) => void push());
+
+// no todo fallo deja rastro almacenado: que el script no aplique a la página que
+// se está mirando, o que nunca se le haya visto correr, se deduce aquí
+const collectDiagnostics = async (script: DiagonalScript, url: string): Promise<ScriptDiagnostic[]> => {
+	const stored = (await loadDiagnostics()).filter((d) => d.scriptId === script.id);
+	const at = new Date().toISOString();
+	const derived: ScriptDiagnostic[] = [];
+
+	if (!script.enabled) {
+		derived.push({ scriptId: script.id, kind: 'registration', message: 'the script is disabled, so it is not registered', at });
+	} else if (url && !matchesUrl(script, url)) {
+		derived.push({
+			scriptId: script.id,
+			kind: 'mismatch',
+			message: `the current page matches none of the script's @match patterns (${script.matches.join(', ') || 'none declared'})`,
+			at,
+			url,
+		});
+	} else if (url && !(await loadRuns())[script.id]) {
+		derived.push({
+			scriptId: script.id,
+			kind: 'mismatch',
+			message: 'the script matches this page but has never been observed running on it',
+			at,
+			url,
+		});
+	}
+	return [...derived, ...stored];
+};
 
 const refreshHostStatus = async (): Promise<void> => {
 	const event = await requestOne({ id: crypto.randomUUID(), type: 'status' });
@@ -39,9 +83,14 @@ browser.permissions.onAdded.addListener(() => void syncRegistrations());
 // hay que llamarlo síncronamente dentro del handler, sin await previo, o firefox lo rechaza
 browser.action.onClicked.addListener(() => void browser.sidebarAction.toggle());
 
+// los scripts instrumentados reportan desde su mundo aislado en cualquier momento
+listenForScriptReports(notify);
+
 browser.runtime.onConnect.addListener((sidebar) => {
 	const post = (message: BackgroundToSidebar): void => sidebar.postMessage(message);
 	const pushState = async (): Promise<void> => post({ type: 'ui:state', state: await buildState() });
+	subscribers.add(pushState);
+	sidebar.onDisconnect.addListener(() => subscribers.delete(pushState));
 
 	// generar y reprompt comparten ciclo: streaming al chat y propuesta al cerrar
 	const runGeneration = async (build: (context: PageContext) => HostRequest): Promise<void> => {
@@ -68,6 +117,26 @@ browser.runtime.onConnect.addListener((sidebar) => {
 	// persiste en el espejo y en disco, y reajusta el registro a los nuevos @match
 	const commit = async (script: DiagonalScript, scripts: DiagonalScript[]): Promise<void> => {
 		await saveScripts(scripts);
+
+		// el host tiene el único parser del proyecto: se le pregunta antes de
+		// registrar, porque un script que no compila fallaría en silencio
+		const checked = await requestOne({ id: crypto.randomUUID(), type: 'check', code: script.code });
+		// si el host no contesta no se sabe nada nuevo: el diagnóstico previo sigue
+		// siendo la mejor información, así que solo se toca con una respuesta real
+		if (checked.type !== 'check') {
+			console.warn('[diagonal] sin comprobación de sintaxis: host no disponible');
+		} else if (!checked.ok) {
+			await recordDiagnostic({
+				scriptId: script.id,
+				kind: 'syntax',
+				message: checked.message ?? 'the script does not parse',
+				at: new Date().toISOString(),
+				line: checked.line,
+			});
+		} else {
+			await clearDiagnostics(script.id, 'syntax');
+		}
+
 		await requestOne({ id: crypto.randomUUID(), type: 'save', script });
 		await syncRegistrations();
 		await pushState();
@@ -92,6 +161,25 @@ browser.runtime.onConnect.addListener((sidebar) => {
 				script: { ...base, code },
 				prompt,
 				context,
+			}));
+		},
+
+		'ui:diagnose': async ({ scriptId }) => {
+			const script = (await loadScripts()).find((s) => s.id === scriptId);
+			if (!script) return;
+			// se recoge antes de arrancar la generación: la pestaña puede cambiar
+			const evidence = await captureEvidence();
+			const diagnostics = await collectDiagnostics(script, evidence?.url ?? '');
+			// prompt vacío: la instrucción de arreglo la pone el host, que es donde
+			// vive todo el texto dirigido al modelo
+			await runGeneration((context) => ({
+				id: crypto.randomUUID(),
+				type: 'refine',
+				script,
+				prompt: '',
+				context,
+				diagnostics,
+				evidence,
 			}));
 		},
 

@@ -2,15 +2,19 @@ import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { Script } from 'node:vm';
 import { query } from '@anthropic-ai/claude-agent-sdk';
+import type { SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 import {
 	BILLING_ENV_BLOCKLIST,
 	DEFAULT_MODEL,
 	applyCode,
+	instrument,
+	instrumentedOffset,
 	matchPatternFromUrl,
 	parseMetadata,
 } from '@diagonal/shared';
-import type { AuthState, DiagonalScript, PageContext } from '@diagonal/shared';
+import type { AuthState, DiagonalScript, PageContext, PageEvidence, ScriptDiagnostic } from '@diagonal/shared';
 import { SYSTEM_PROMPT, buildPrompt, buildRefinePrompt, extractScriptCode } from './prompt.js';
 
 // entorno purgado de credenciales de api: sin ellas, claude code solo puede
@@ -25,18 +29,58 @@ export const authState = (): AuthState => {
 	return existsSync(join(homedir(), '.claude', '.credentials.json')) ? 'subscription' : 'missing';
 };
 
+// el único parser de javascript del proyecto está aquí: la extensión no puede
+// compilar código sin eval. se valida la fuente instrumentada, la misma que se
+// registra, para cazar también una expresión @diagonal-verify rota
+export const checkSyntax = (code: string): { ok: boolean; message?: string; line?: number } => {
+	const probe: DiagonalScript = {
+		id: 'check', name: '', description: '', matches: [], code,
+		enabled: false, createdAt: '', updatedAt: '',
+	};
+	const script = { ...probe, verify: parseMetadata(code).verify };
+	try {
+		new Script(instrument(script));
+		return { ok: true };
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		// v8 delata la línea en la primera del stack, con el formato archivo:línea;
+		// se descuenta el envoltorio para que apunte al código que el usuario ve
+		const raw = error instanceof Error ? Number(/:(\d+)$/.exec(error.stack?.split('\n')[0] ?? '')?.[1]) : Number.NaN;
+		const line = raw - instrumentedOffset(script);
+		return { ok: false, message, line: Number.isFinite(line) && line > 0 ? line : undefined };
+	}
+};
+
+// la captura solo puede viajar por la forma de prompt en streaming, que es la
+// única que admite bloques de contenido además de texto
+const withScreenshot = async function* (text: string, screenshot: string): AsyncGenerator<SDKUserMessage> {
+	yield {
+		type: 'user',
+		session_id: '',
+		parent_tool_use_id: null,
+		message: {
+			role: 'user',
+			content: [
+				{ type: 'text', text },
+				{ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: screenshot } },
+			],
+		},
+	};
+};
+
 // un turno contra el modelo: emite el streaming y devuelve lo único que ambas
 // operaciones necesitan de él, el código y la sesión con la que continuar
 const runQuery = async (
 	prompt: string,
 	onChunk: (text: string) => void,
 	resume?: string,
+	screenshot?: string,
 ): Promise<{ code: string; sessionId?: string }> => {
 	let sessionId: string | undefined;
 	let finalText = '';
 
 	const conversation = query({
-		prompt,
+		prompt: screenshot ? withScreenshot(prompt, screenshot) : prompt,
 		options: {
 			model: DEFAULT_MODEL,
 			systemPrompt: SYSTEM_PROMPT,
@@ -97,20 +141,23 @@ export const refineScript = async (
 	prompt: string,
 	context: PageContext,
 	onChunk: (text: string) => void,
+	diagnostics?: ScriptDiagnostic[],
+	evidence?: PageEvidence,
 ): Promise<DiagonalScript> => {
-	const refinePrompt = buildRefinePrompt(prompt, script, context);
+	const refinePrompt = buildRefinePrompt(prompt, script, context, diagnostics, evidence);
+	const screenshot = evidence?.screenshot;
 	let streamed = false;
 	const track = (text: string): void => {
 		streamed = true;
 		onChunk(text);
 	};
 
-	const { code, sessionId } = await runQuery(refinePrompt, track, script.sessionId).catch((error: unknown) => {
+	const { code, sessionId } = await runQuery(refinePrompt, track, script.sessionId, screenshot).catch((error: unknown) => {
 		// la sesión pudo caducar o borrarse; el prompt ya lleva el código completo,
 		// así que se reintenta sin memoria salvo que el fallo llegara con el stream ya abierto
 		if (!script.sessionId || streamed) throw error;
 		console.warn('[diagonal] sesión no reanudable, reintento sin memoria', error);
-		return runQuery(refinePrompt, track);
+		return runQuery(refinePrompt, track, undefined, screenshot);
 	});
 	return { ...applyCode(script, code), sessionId: sessionId ?? script.sessionId };
 };

@@ -132,6 +132,17 @@ summary { margin: 0 0 6px; font-size: 10px; font-weight: 400; color: var(--muted
 	min-width: 0;
 }
 #scripts li:hover { border-color: var(--edge); }
+/* marca de fallo en la fila: el detalle explica, aquí solo se señala */
+#scripts .broken { flex: 0 0 auto; color: var(--danger); cursor: help; }
+
+#detail-issues { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+#detail-issues li {
+	padding: 5px 8px;
+	border: 1px solid var(--danger-edge);
+	background: var(--danger-bg);
+	overflow-wrap: anywhere;
+}
+#detail-issues .kind { color: var(--danger); text-transform: lowercase; margin-right: 6px; }
 #scripts .name {
 	flex: 1;
 	min-width: 0;

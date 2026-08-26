@@ -6,7 +6,16 @@ export interface RegisteredUserScript {
 	js: Array<{ code: string } | { file: string }>;
 	runAt?: 'document_start' | 'document_end' | 'document_idle';
 	world?: 'USER_SCRIPT' | 'MAIN';
+	// un mundo por script: aísla sus listeners y atribuye sus mensajes
+	worldId?: string;
 	allFrames?: boolean;
+}
+
+export interface WorldProperties {
+	worldId?: string;
+	csp?: string;
+	// expone runtime.sendMessage dentro del mundo; sin esto un fallo es mudo
+	messaging?: boolean;
 }
 
 interface UserScriptsNamespace {
@@ -14,6 +23,8 @@ interface UserScriptsNamespace {
 	update(scripts: RegisteredUserScript[]): Promise<void>;
 	unregister(filter?: { ids?: string[] }): Promise<void>;
 	getScripts(filter?: { ids?: string[] }): Promise<RegisteredUserScript[]>;
+	configureWorld(properties: WorldProperties): Promise<void>;
+	resetWorldConfiguration(worldId?: string): Promise<void>;
 }
 
 // el namespace solo existe cuando el permiso opcional está concedido
