@@ -4,6 +4,10 @@ import type { DiagonalScript, PageContext } from './userscript.js';
 export type HostRequest =
 	| { id: string; type: 'status' }
 	| { id: string; type: 'generate'; prompt: string; context: PageContext }
+	// reprompt sobre un script existente: el host reanuda su sesión de claude si la hay
+	| { id: string; type: 'refine'; script: DiagonalScript; prompt: string; context: PageContext }
+	// el host solo escribe en disco cuando se le pide: las propuestas viven en la extensión
+	| { id: string; type: 'save'; script: DiagonalScript }
 	| { id: string; type: 'list' }
 	| { id: string; type: 'delete'; scriptId: string };
 

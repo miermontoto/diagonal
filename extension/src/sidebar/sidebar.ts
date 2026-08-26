@@ -14,9 +14,14 @@ const statusDot = $('status-dot');
 const statusText = $('status-text');
 const onboarding = $('onboarding');
 const chat = $('chat');
-const proposal = $('proposal');
-const proposalName = $('proposal-name');
-const proposalCode = $<HTMLPreElement>('proposal-code');
+const detailSection = $('detail');
+const detailTitle = $('detail-title');
+const detailName = $('detail-name');
+const detailCode = $<HTMLTextAreaElement>('detail-code');
+const approveButton = $<HTMLButtonElement>('approve');
+const discardButton = $<HTMLButtonElement>('discard');
+const saveButton = $<HTMLButtonElement>('save');
+const closeButton = $<HTMLButtonElement>('close');
 const scriptsList = $<HTMLUListElement>('scripts');
 const scriptsCount = $('scripts-count');
 const scopePage = $<HTMLInputElement>('scope-page');
@@ -30,7 +35,10 @@ promptInput.placeholder = t('promptPlaceholder');
 const port = browser.runtime.connect({ name: 'diagonal-sidebar' });
 const send = (message: SidebarToBackground): void => port.postMessage(message);
 
-let currentProposal: DiagonalScript | undefined;
+// el panel de detalle sirve dos modos sobre la misma vista de código: revisar
+// lo que acaba de proponer el modelo, o editar a mano un script ya guardado
+type Detail = { script: DiagonalScript; mode: 'proposal' | 'edit' };
+let detail: Detail | undefined;
 // último listado recibido y url de la pestaña activa: juntos deciden qué se pinta
 let allScripts: DiagonalScript[] = [];
 let currentUrl = '';
@@ -46,6 +54,26 @@ const addBubble = (kind: 'user' | 'model' | 'error', text: string): HTMLElement 
 	return bubble;
 };
 
+const openDetail = (script: DiagonalScript, mode: Detail['mode']): void => {
+	detail = { script, mode };
+	detailTitle.textContent = t(mode === 'proposal' ? 'proposalTitle' : 'editTitle');
+	detailName.textContent = script.name;
+	detailCode.value = script.code;
+	approveButton.hidden = mode !== 'proposal';
+	discardButton.hidden = mode !== 'proposal';
+	saveButton.hidden = mode !== 'edit';
+	closeButton.hidden = mode !== 'edit';
+	detailSection.hidden = false;
+	// con un script abierto, el prompt reformula ese script en vez de crear otro
+	promptInput.placeholder = t('refinePlaceholder');
+};
+
+const closeDetail = (): void => {
+	detail = undefined;
+	detailSection.hidden = true;
+	promptInput.placeholder = t('promptPlaceholder');
+};
+
 // por defecto el listado se acota a los scripts que aplican a la pestaña activa
 const renderScripts = (): void => {
 	const visible = scopePage.checked ? allScripts.filter((script) => matchesUrl(script, currentUrl)) : allScripts;
@@ -59,10 +87,12 @@ const renderScripts = (): void => {
 			toggle.checked = script.enabled;
 			toggle.addEventListener('change', () => send({ type: 'ui:toggle', scriptId: script.id, enabled: toggle.checked }));
 
-			const name = document.createElement('span');
+			const name = document.createElement('button');
+			name.type = 'button';
 			name.className = 'name';
 			name.textContent = script.name;
 			name.title = script.description;
+			name.addEventListener('click', () => openDetail(script, 'edit'));
 
 			const remove = document.createElement('button');
 			remove.className = 'danger';
@@ -120,10 +150,7 @@ port.onMessage.addListener((raw) => {
 			return;
 		case 'ui:proposal':
 			streamBubble = undefined;
-			currentProposal = message.script;
-			proposalName.textContent = message.script.name;
-			proposalCode.textContent = message.script.code;
-			proposal.hidden = false;
+			openDetail(message.script, 'proposal');
 			return;
 		case 'ui:error':
 			streamBubble = undefined;
@@ -140,22 +167,29 @@ form.addEventListener('submit', (event) => {
 	streamBubble = addBubble('model', t('generating'));
 	streamBubble.textContent = '';
 	promptInput.value = '';
-	send({ type: 'ui:generate', prompt });
+	send(detail ? { type: 'ui:refine', scriptId: detail.script.id, prompt, code: detailCode.value } : { type: 'ui:generate', prompt });
 });
 
-$('approve').addEventListener('click', () => {
-	if (!currentProposal) return;
-	send({ type: 'ui:approve', scriptId: currentProposal.id });
-	proposal.hidden = true;
-	currentProposal = undefined;
+approveButton.addEventListener('click', () => {
+	if (detail?.mode !== 'proposal') return;
+	send({ type: 'ui:approve', scriptId: detail.script.id, code: detailCode.value });
+	closeDetail();
 });
 
-$('discard').addEventListener('click', () => {
-	if (!currentProposal) return;
-	send({ type: 'ui:discard', scriptId: currentProposal.id });
-	proposal.hidden = true;
-	currentProposal = undefined;
+discardButton.addEventListener('click', () => {
+	if (detail?.mode !== 'proposal') return;
+	send({ type: 'ui:discard', scriptId: detail.script.id });
+	closeDetail();
 });
+
+// guardar cierra el panel: es el acuse de recibo de que la edición se aplicó
+saveButton.addEventListener('click', () => {
+	if (detail?.mode !== 'edit') return;
+	send({ type: 'ui:save', scriptId: detail.script.id, code: detailCode.value });
+	closeDetail();
+});
+
+closeButton.addEventListener('click', () => closeDetail());
 
 // userScripts es un permiso optional-only: firefox obliga a pedirlo solo, sin
 // otros permisos ni origins en la misma llamada, de ahí la concesión en dos pasos.

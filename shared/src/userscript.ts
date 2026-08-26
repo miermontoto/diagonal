@@ -46,6 +46,20 @@ export const parseMetadata = (code: string): ScriptMetadata => {
 	};
 };
 
+// aplica código nuevo sobre un script releyendo sus metadatos: si un reprompt o
+// una edición a mano tocaron los @match, el registro en firefox debe seguirlos
+export const applyCode = (script: DiagonalScript, code: string): DiagonalScript => {
+	const meta = parseMetadata(code);
+	return {
+		...script,
+		name: meta.name ?? script.name,
+		description: meta.description ?? script.description,
+		matches: meta.matches.length > 0 ? meta.matches : script.matches,
+		code,
+		updatedAt: new Date().toISOString(),
+	};
+};
+
 // deriva un patrón de coincidencia razonable a partir de la url de la pestaña
 export const matchPatternFromUrl = (url: string): string => {
 	try {

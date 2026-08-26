@@ -1,7 +1,7 @@
 import { PROTOCOL_VERSION } from '@diagonal/shared';
 import type { HostEvent, HostRequest } from '@diagonal/shared';
-import { authState, generateScript } from './claude.js';
-import { deleteScript, listScripts, scriptsDir } from './store.js';
+import { authState, generateScript, refineScript } from './claude.js';
+import { deleteScript, listScripts, saveScript, scriptsDir } from './store.js';
 
 // despacha cada petición y emite sus eventos; el error handling vive aquí para
 // que ninguna petición pueda tumbar el proceso del host
@@ -15,12 +15,23 @@ export const handleRequest = async (request: HostRequest, emit: (event: HostEven
 			case 'list':
 				emit({ id, type: 'list', scripts: listScripts() });
 				return;
+			case 'save':
+				saveScript(request.script);
+				emit({ id, type: 'ok' });
+				return;
 			case 'delete':
 				deleteScript(request.scriptId);
 				emit({ id, type: 'ok' });
 				return;
 			case 'generate': {
 				const script = await generateScript(request.prompt, request.context, (text) =>
+					emit({ id, type: 'chunk', text }),
+				);
+				emit({ id, type: 'script', script });
+				return;
+			}
+			case 'refine': {
+				const script = await refineScript(request.script, request.prompt, request.context, (text) =>
 					emit({ id, type: 'chunk', text }),
 				);
 				emit({ id, type: 'script', script });

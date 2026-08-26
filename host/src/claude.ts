@@ -6,12 +6,12 @@ import { query } from '@anthropic-ai/claude-agent-sdk';
 import {
 	BILLING_ENV_BLOCKLIST,
 	DEFAULT_MODEL,
+	applyCode,
 	matchPatternFromUrl,
 	parseMetadata,
 } from '@diagonal/shared';
 import type { AuthState, DiagonalScript, PageContext } from '@diagonal/shared';
-import { SYSTEM_PROMPT, buildPrompt, extractScriptCode } from './prompt.js';
-import { saveScript } from './store.js';
+import { SYSTEM_PROMPT, buildPrompt, buildRefinePrompt, extractScriptCode } from './prompt.js';
 
 // entorno purgado de credenciales de api: sin ellas, claude code solo puede
 // autenticarse contra la suscripción, que es la garantía de coste del proyecto
@@ -25,16 +25,18 @@ export const authState = (): AuthState => {
 	return existsSync(join(homedir(), '.claude', '.credentials.json')) ? 'subscription' : 'missing';
 };
 
-export const generateScript = async (
+// un turno contra el modelo: emite el streaming y devuelve lo único que ambas
+// operaciones necesitan de él, el código y la sesión con la que continuar
+const runQuery = async (
 	prompt: string,
-	context: PageContext,
 	onChunk: (text: string) => void,
-): Promise<DiagonalScript> => {
+	resume?: string,
+): Promise<{ code: string; sessionId?: string }> => {
 	let sessionId: string | undefined;
 	let finalText = '';
 
 	const conversation = query({
-		prompt: buildPrompt(prompt, context),
+		prompt,
 		options: {
 			model: DEFAULT_MODEL,
 			systemPrompt: SYSTEM_PROMPT,
@@ -43,6 +45,7 @@ export const generateScript = async (
 			maxTurns: 1,
 			includePartialMessages: true,
 			env: subscriptionEnv(),
+			resume,
 		},
 	});
 
@@ -61,10 +64,19 @@ export const generateScript = async (
 
 	const code = extractScriptCode(finalText);
 	if (!code) throw new Error('la respuesta del modelo no contiene ningún bloque de código');
+	return { code, sessionId };
+};
 
+export const generateScript = async (
+	prompt: string,
+	context: PageContext,
+	onChunk: (text: string) => void,
+): Promise<DiagonalScript> => {
+	const { code, sessionId } = await runQuery(buildPrompt(prompt, context), onChunk);
 	const meta = parseMetadata(code);
 	const now = new Date().toISOString();
-	const script: DiagonalScript = {
+
+	return {
 		id: randomUUID(),
 		name: meta.name ?? context.title,
 		description: meta.description ?? prompt,
@@ -76,6 +88,29 @@ export const generateScript = async (
 		updatedAt: now,
 		sessionId,
 	};
-	saveScript(script);
-	return script;
+};
+
+// reprompt: conserva id, alta y estado porque sigue siendo el mismo script,
+// y los metadatos solo se pisan si el código nuevo los trae
+export const refineScript = async (
+	script: DiagonalScript,
+	prompt: string,
+	context: PageContext,
+	onChunk: (text: string) => void,
+): Promise<DiagonalScript> => {
+	const refinePrompt = buildRefinePrompt(prompt, script, context);
+	let streamed = false;
+	const track = (text: string): void => {
+		streamed = true;
+		onChunk(text);
+	};
+
+	const { code, sessionId } = await runQuery(refinePrompt, track, script.sessionId).catch((error: unknown) => {
+		// la sesión pudo caducar o borrarse; el prompt ya lleva el código completo,
+		// así que se reintenta sin memoria salvo que el fallo llegara con el stream ya abierto
+		if (!script.sessionId || streamed) throw error;
+		console.warn('[diagonal] sesión no reanudable, reintento sin memoria', error);
+		return runQuery(refinePrompt, track);
+	});
+	return { ...applyCode(script, code), sessionId: sessionId ?? script.sessionId };
 };

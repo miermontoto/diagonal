@@ -11,7 +11,13 @@ export interface UiState {
 export type SidebarToBackground =
 	| { type: 'ui:init' }
 	| { type: 'ui:generate'; prompt: string }
-	| { type: 'ui:approve'; scriptId: string }
+	// reprompt: code es lo que se ve en el panel, que puede ser una propuesta sin
+	// aprobar o una edición a mano, y por tanto adelantar a lo guardado
+	| { type: 'ui:refine'; scriptId: string; prompt: string; code: string }
+	// edición a mano del código desde el panel de detalle
+	| { type: 'ui:save'; scriptId: string; code: string }
+	// approve lleva code porque la propuesta también es editable antes de aceptarla
+	| { type: 'ui:approve'; scriptId: string; code: string }
 	| { type: 'ui:discard'; scriptId: string }
 	| { type: 'ui:toggle'; scriptId: string; enabled: boolean }
 	| { type: 'ui:delete'; scriptId: string }

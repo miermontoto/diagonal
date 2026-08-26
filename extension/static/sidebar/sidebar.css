@@ -87,18 +87,25 @@ summary { margin: 0 0 6px; font-size: 10px; font-weight: 400; color: var(--muted
 .msg.model { align-self: flex-start; background: var(--card); }
 .msg.error { align-self: flex-start; background: var(--danger-bg); border-color: var(--danger-edge); color: #fff; }
 
-#proposal { border-top: 1px solid var(--border); }
-#proposal-name { font-weight: 400; margin-bottom: 6px; }
-#proposal-code {
-	max-height: 200px;
-	overflow: auto;
+#detail { border-top: 1px solid var(--border); }
+#detail-name { font-weight: 400; margin-bottom: 6px; }
+/* el código es editable: mismo bloque de siempre, pero como campo */
+#detail-code {
+	display: block;
+	width: 100%;
+	height: 200px;
+	resize: vertical;
 	margin: 0 0 8px;
 	padding: 8px;
 	border: 1px solid var(--border);
 	background: var(--code-bg);
+	color: inherit;
 	font: inherit;
 	font-size: 11px;
+	white-space: pre;
+	overflow: auto;
 }
+#detail-code:focus-visible { outline: none; border-color: var(--edge); }
 
 /* el listado abre la barra: se pliega entero y solo scrollea la lista,
    de modo que cabecera y filtro quedan siempre a la vista */
@@ -125,7 +132,22 @@ summary { margin: 0 0 6px; font-size: 10px; font-weight: 400; color: var(--muted
 	min-width: 0;
 }
 #scripts li:hover { border-color: var(--edge); }
-#scripts .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#scripts .name {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	padding: 0;
+	border: 0;
+	background: none;
+	color: inherit;
+	font: inherit;
+	text-align: left;
+	text-transform: none;
+	align-self: auto;
+}
+#scripts .name:hover { background: none; text-decoration: underline; }
 #empty { color: var(--muted); margin: 0; text-transform: lowercase; }
 
 input[type='checkbox'] { accent-color: var(--fg); margin: 0; }

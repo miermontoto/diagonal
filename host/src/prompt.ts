@@ -1,4 +1,4 @@
-import type { PageContext } from '@diagonal/shared';
+import type { DiagonalScript, PageContext } from '@diagonal/shared';
 
 // el prompt de sistema fija el contrato de salida: un único bloque de código
 // con metadatos ==UserScript==, sin herramientas ni pasos intermedios
@@ -13,7 +13,8 @@ Rules for the script:
 - Make DOM manipulation idempotent (guard against double-application) and resilient to dynamic pages: use a MutationObserver when the target elements may render late.
 - Never make network requests (fetch/XMLHttpRequest/WebSocket/beacons) unless the user explicitly asked for them.
 - Never use eval or injected <script> tags.
-- Prefer CSS injection via a <style> element for purely visual changes.`;
+- Prefer CSS injection via a <style> element for purely visual changes.
+- When an existing script is provided, return the complete modified script, never a diff, patch or fragment. Keep its @name unless the change makes it inaccurate.`;
 
 export const buildPrompt = (prompt: string, context: PageContext): string =>
 	[
@@ -24,6 +25,16 @@ export const buildPrompt = (prompt: string, context: PageContext): string =>
 	]
 		.filter(Boolean)
 		.join('\n\n');
+
+// reprompt: el código actual manda sobre la memoria de la sesión, porque el
+// usuario puede haberlo editado a mano entre una generación y la siguiente
+export const buildRefinePrompt = (prompt: string, script: DiagonalScript, context: PageContext): string =>
+	[
+		`Page URL: ${context.url}`,
+		`Page title: ${context.title}`,
+		`Current script "${script.name}":\n\`\`\`javascript\n${script.code}\n\`\`\``,
+		`Requested change: ${prompt}`,
+	].join('\n\n');
 
 const CODE_FENCE = /```(?:javascript|js)?\n([\s\S]*?)```/g;
 
