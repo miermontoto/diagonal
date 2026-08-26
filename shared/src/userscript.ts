@@ -97,8 +97,9 @@ export const applyCode = (script: DiagonalScript, code: string): DiagonalScript 
 // deriva un patrón de coincidencia razonable a partir de la url de la pestaña
 export const matchPatternFromUrl = (url: string): string => {
 	try {
-		const { protocol, host } = new URL(url);
-		return protocol === 'http:' || protocol === 'https:' ? `*://${host}/*` : url;
+		// hostname y no host: el puerto no cabe en un match pattern
+		const { protocol, hostname } = new URL(url);
+		return protocol === 'http:' || protocol === 'https:' ? `*://${hostname}/*` : url;
 	} catch {
 		return '<all_urls>';
 	}
@@ -107,6 +108,24 @@ export const matchPatternFromUrl = (url: string): string => {
 // firefox no expone su matcher de patrones a las extensiones, así que se replica:
 // esquema, host y ruta tienen reglas propias y no son un glob único
 const ALL_URLS = '<all_urls>';
+
+// firefox no admite puertos en los match patterns, así que un patrón con puerto
+// ni registra ni encaja con nada. se le quita en vez de rechazarlo: los scripts
+// ya generados llevan el puerto escrito en sus @match
+const stripPort = (host: string): string => {
+	// una ip v6 va entre corchetes y lleva sus propios dos puntos dentro
+	const afterBrackets = host.startsWith('[') ? host.indexOf(']') + 1 : 0;
+	const colon = host.indexOf(':', afterBrackets);
+	return colon === -1 ? host : host.slice(0, colon);
+};
+
+// deja el patrón como firefox puede aceptarlo
+export const normalizeMatchPattern = (pattern: string): string => {
+	const parts = PATTERN.exec(pattern);
+	if (!parts) return pattern;
+	const [, scheme = '', host = '', path = ''] = parts;
+	return `${scheme}://${stripPort(host)}${path}`;
+};
 const PATTERN = /^(\*|[a-z][a-z0-9+.-]*):\/\/(\*|(?:\*\.)?[^/*]*)(\/.*)$/i;
 const ALL_URLS_SCHEMES = /^(https?|wss?|ftp|file|data):$/;
 
@@ -135,7 +154,7 @@ export const matchesPattern = (pattern: string, url: string): boolean => {
 
 	// '*.' admite tanto el dominio base como cualquier subdominio
 	const hostname = parsed.hostname.toLowerCase();
-	const expected = host.toLowerCase();
+	const expected = stripPort(host.toLowerCase());
 	if (expected !== '*') {
 		if (expected.startsWith('*.')) {
 			const base = expected.slice(2);

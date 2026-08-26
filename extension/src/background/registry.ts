@@ -1,4 +1,4 @@
-import { MAX_DIAGNOSTICS_PER_SCRIPT, instrument, isValidMatchPattern } from '@diagonal/shared';
+import { MAX_DIAGNOSTICS_PER_SCRIPT, instrument, isValidMatchPattern, normalizeMatchPattern } from '@diagonal/shared';
 import type { DiagonalScript, DiagnosticKind, ScriptDiagnostic } from '@diagonal/shared';
 import { userScriptsApi } from './userscripts-api';
 import type { RegisteredUserScript } from './userscripts-api';
@@ -57,7 +57,7 @@ export const recordRun = async (scriptId: string, url: string): Promise<void> =>
 
 const toRegistered = (script: DiagonalScript): RegisteredUserScript => ({
 	id: script.id,
-	matches: script.matches,
+	matches: script.matches.map(normalizeMatchPattern),
 	js: [{ code: instrument(script) }],
 	runAt: 'document_idle',
 	world: 'USER_SCRIPT',
