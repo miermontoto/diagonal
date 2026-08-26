@@ -17,7 +17,6 @@
 	"discard": { "message": "Discard" },
 	"scriptsTitle": { "message": "Scripts" },
 	"filterPage": { "message": "This page" },
-	"filterAll": { "message": "All" },
 	"emptyScriptsPage": { "message": "No scripts for this page." },
 	"emptyScripts": { "message": "No scripts yet." },
 	"delete": { "message": "Delete" }

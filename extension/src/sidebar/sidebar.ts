@@ -19,7 +19,6 @@ const proposalName = $('proposal-name');
 const proposalCode = $<HTMLPreElement>('proposal-code');
 const scriptsList = $<HTMLUListElement>('scripts');
 const scriptsCount = $('scripts-count');
-const scriptsFilter = $('scripts-filter');
 const scopePage = $<HTMLInputElement>('scope-page');
 const empty = $('empty');
 const form = $<HTMLFormElement>('prompt-form');
@@ -87,7 +86,7 @@ const refreshCurrentUrl = async (): Promise<void> => {
 };
 
 // el filtro depende de la pestaña visible: hay que reaccionar al cambio y a la navegación
-scriptsFilter.addEventListener('change', () => renderScripts());
+scopePage.addEventListener('change', () => renderScripts());
 browser.tabs.onActivated.addListener(() => void refreshCurrentUrl());
 browser.tabs.onUpdated.addListener((_id, _change, tab) => {
 	if (tab.active) void refreshCurrentUrl();
