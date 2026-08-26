@@ -18,6 +18,19 @@
 		<button id="grant"></button>
 	</section>
 
+	<details id="scripts-section" open>
+		<summary>
+			<span data-i18n="scriptsTitle"></span>
+			<span id="scripts-count"></span>
+		</summary>
+		<div id="scripts-filter" class="row">
+			<label><input type="radio" id="scope-page" name="scope" value="page" checked /><span data-i18n="filterPage"></span></label>
+			<label><input type="radio" name="scope" value="all" /><span data-i18n="filterAll"></span></label>
+		</div>
+		<ul id="scripts"></ul>
+		<p id="empty"></p>
+	</details>
+
 	<main id="chat"></main>
 
 	<section id="proposal" hidden>
@@ -28,12 +41,6 @@
 			<button id="approve" data-i18n="approve"></button>
 			<button id="discard" class="secondary" data-i18n="discard"></button>
 		</div>
-	</section>
-
-	<section id="scripts-section">
-		<h2 data-i18n="scriptsTitle"></h2>
-		<ul id="scripts"></ul>
-		<p id="empty" data-i18n="emptyScripts"></p>
 	</section>
 
 	<form id="prompt-form">

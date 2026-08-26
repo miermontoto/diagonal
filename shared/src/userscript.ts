@@ -55,3 +55,50 @@ export const matchPatternFromUrl = (url: string): string => {
 		return '<all_urls>';
 	}
 };
+
+// firefox no expone su matcher de patrones a las extensiones, así que se replica:
+// esquema, host y ruta tienen reglas propias y no son un glob único
+const ALL_URLS = '<all_urls>';
+const PATTERN = /^(\*|[a-z][a-z0-9+.-]*):\/\/(\*|(?:\*\.)?[^/*]*)(\/.*)$/i;
+const ALL_URLS_SCHEMES = /^(https?|wss?|ftp|file|data):$/;
+
+// traduce un glob a regexp escapando todo salvo el comodín
+const globToRegExp = (glob: string): RegExp =>
+	new RegExp(`^${glob.split('*').map((part) => part.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('.*')}$`);
+
+// evalúa un match pattern de webextensions contra una url concreta
+export const matchesPattern = (pattern: string, url: string): boolean => {
+	let parsed: URL;
+	try {
+		parsed = new URL(url);
+	} catch {
+		return false;
+	}
+	if (pattern === ALL_URLS) return ALL_URLS_SCHEMES.test(parsed.protocol);
+
+	const parts = PATTERN.exec(pattern);
+	if (!parts) return false;
+	const [, scheme = '', host = '', path = ''] = parts;
+
+	// el comodín de esquema cubre solo http y https
+	if (scheme === '*') {
+		if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false;
+	} else if (parsed.protocol !== `${scheme.toLowerCase()}:`) return false;
+
+	// '*.' admite tanto el dominio base como cualquier subdominio
+	const hostname = parsed.hostname.toLowerCase();
+	const expected = host.toLowerCase();
+	if (expected !== '*') {
+		if (expected.startsWith('*.')) {
+			const base = expected.slice(2);
+			if (hostname !== base && !hostname.endsWith(`.${base}`)) return false;
+		} else if (hostname !== expected) return false;
+	}
+
+	// la ruta del patrón se compara contra pathname + query
+	return globToRegExp(path).test(`${parsed.pathname}${parsed.search}`);
+};
+
+// un script aplica a la página si alguno de sus patrones coincide
+export const matchesUrl = (script: DiagonalScript, url: string): boolean =>
+	script.matches.some((pattern) => matchesPattern(pattern, url));

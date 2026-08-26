@@ -1,4 +1,4 @@
-import type { DiagonalScript } from '@diagonal/shared';
+import { matchesUrl, type DiagonalScript } from '@diagonal/shared';
 import type { BackgroundToSidebar, SidebarToBackground, UiState } from '../messages';
 
 const t = (key: string): string => browser.i18n.getMessage(key);
@@ -18,6 +18,9 @@ const proposal = $('proposal');
 const proposalName = $('proposal-name');
 const proposalCode = $<HTMLPreElement>('proposal-code');
 const scriptsList = $<HTMLUListElement>('scripts');
+const scriptsCount = $('scripts-count');
+const scriptsFilter = $('scripts-filter');
+const scopePage = $<HTMLInputElement>('scope-page');
 const empty = $('empty');
 const form = $<HTMLFormElement>('prompt-form');
 const promptInput = $<HTMLTextAreaElement>('prompt');
@@ -29,6 +32,9 @@ const port = browser.runtime.connect({ name: 'diagonal-sidebar' });
 const send = (message: SidebarToBackground): void => port.postMessage(message);
 
 let currentProposal: DiagonalScript | undefined;
+// último listado recibido y url de la pestaña activa: juntos deciden qué se pinta
+let allScripts: DiagonalScript[] = [];
+let currentUrl = '';
 // burbuja en curso donde se acumula el streaming de la generación
 let streamBubble: HTMLElement | undefined;
 
@@ -41,9 +47,12 @@ const addBubble = (kind: 'user' | 'model' | 'error', text: string): HTMLElement 
 	return bubble;
 };
 
-const renderScripts = (scripts: DiagonalScript[]): void => {
+// por defecto el listado se acota a los scripts que aplican a la pestaña activa
+const renderScripts = (): void => {
+	const visible = scopePage.checked ? allScripts.filter((script) => matchesUrl(script, currentUrl)) : allScripts;
+
 	scriptsList.replaceChildren(
-		...scripts.map((script) => {
+		...visible.map((script) => {
 			const item = document.createElement('li');
 
 			const toggle = document.createElement('input');
@@ -65,8 +74,24 @@ const renderScripts = (scripts: DiagonalScript[]): void => {
 			return item;
 		}),
 	);
-	empty.hidden = scripts.length > 0;
+	empty.hidden = visible.length > 0;
+	// con scripts guardados pero ninguno aplicable, el vacío es del filtro, no del listado
+	empty.textContent = t(allScripts.length === 0 ? 'emptyScripts' : 'emptyScriptsPage');
+	scriptsCount.textContent = visible.length === allScripts.length ? `${allScripts.length}` : `${visible.length}/${allScripts.length}`;
 };
+
+const refreshCurrentUrl = async (): Promise<void> => {
+	const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+	currentUrl = tab?.url ?? '';
+	renderScripts();
+};
+
+// el filtro depende de la pestaña visible: hay que reaccionar al cambio y a la navegación
+scriptsFilter.addEventListener('change', () => renderScripts());
+browser.tabs.onActivated.addListener(() => void refreshCurrentUrl());
+browser.tabs.onUpdated.addListener((_id, _change, tab) => {
+	if (tab.active) void refreshCurrentUrl();
+}, { properties: ['url'] });
 
 const renderState = (state: UiState): void => {
 	void refreshOnboarding();
@@ -79,7 +104,8 @@ const renderState = (state: UiState): void => {
 	statusText.textContent = t(status);
 	statusDot.className = `dot ${state.host === 'ready' && state.auth !== 'missing' ? 'ready' : 'error'}`;
 
-	renderScripts(state.scripts);
+	allScripts = state.scripts;
+	renderScripts();
 };
 
 port.onMessage.addListener((raw) => {
@@ -161,3 +187,4 @@ grantButton.addEventListener('click', () => {
 });
 
 send({ type: 'ui:init' });
+void refreshCurrentUrl();

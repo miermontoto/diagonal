@@ -66,8 +66,10 @@ header h1 { margin: 0; font-size: 13px; font-weight: 400; letter-spacing: -0.02e
 .dot.error { background: var(--danger); }
 
 section,
-main { padding: 8px 10px; min-width: 0; }
-h2 { margin: 0 0 6px; font-size: 10px; font-weight: 400; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+main,
+details { padding: 8px 10px; min-width: 0; }
+h2,
+summary { margin: 0 0 6px; font-size: 10px; font-weight: 400; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
 
 #onboarding { border-bottom: 1px solid var(--border); }
 #onboarding p { margin: 0 0 6px; color: var(--muted); }
@@ -98,8 +100,22 @@ h2 { margin: 0 0 6px; font-size: 10px; font-weight: 400; color: var(--muted); te
 	font-size: 11px;
 }
 
-#scripts-section { border-top: 1px solid var(--border); max-height: 30vh; overflow-y: auto; }
-#scripts { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+/* el listado abre la barra: se pliega entero y solo scrollea la lista,
+   de modo que cabecera y filtro quedan siempre a la vista */
+#scripts-section { flex: 0 0 auto; border-bottom: 1px solid var(--border); }
+#scripts-section summary { display: flex; align-items: center; gap: 6px; list-style: none; cursor: pointer; user-select: none; }
+#scripts-section summary::-webkit-details-marker { display: none; }
+/* marcador propio: el triángulo nativo desentona con los ángulos rectos del resto */
+#scripts-section summary::before { content: '+'; color: var(--edge); }
+#scripts-section[open] summary::before { content: '−'; }
+#scripts-section summary:hover { color: var(--fg); }
+#scripts-count { margin-left: auto; color: var(--edge); }
+
+#scripts-filter { margin-bottom: 6px; gap: 10px; }
+#scripts-filter label { display: flex; align-items: center; gap: 4px; color: var(--muted); cursor: pointer; text-transform: lowercase; }
+#scripts-filter label:hover { color: var(--fg); }
+
+#scripts { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; max-height: 30vh; overflow-y: auto; }
 #scripts li {
 	display: flex;
 	align-items: center;
@@ -113,7 +129,8 @@ h2 { margin: 0 0 6px; font-size: 10px; font-weight: 400; color: var(--muted); te
 #scripts .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #empty { color: var(--muted); margin: 0; text-transform: lowercase; }
 
-input[type='checkbox'] { accent-color: var(--fg); margin: 0; }
+input[type='checkbox'],
+input[type='radio'] { accent-color: var(--fg); margin: 0; }
 
 form { display: flex; gap: 6px; padding: 8px 10px; border-top: 1px solid var(--border); }
 textarea {
