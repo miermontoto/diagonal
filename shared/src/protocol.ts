@@ -3,7 +3,8 @@ import type { DiagonalScript, PageContext, PageEvidence, ScriptDiagnostic } from
 // peticiones extensión → host, correladas por id
 export type HostRequest =
 	| { id: string; type: 'status' }
-	| { id: string; type: 'generate'; prompt: string; context: PageContext }
+	// resume encadena el turno con la conversación en curso de la sidebar
+	| { id: string; type: 'generate'; prompt: string; context: PageContext; resume?: string }
 	// reprompt sobre un script existente: el host reanuda su sesión de claude si la hay
 	| {
 			id: string;

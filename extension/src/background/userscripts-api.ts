@@ -18,11 +18,20 @@ export interface WorldProperties {
 	messaging?: boolean;
 }
 
+export interface UserScriptInjection {
+	js: Array<{ code: string } | { file: string }>;
+	target: { tabId: number; frameIds?: number[]; allFrames?: boolean };
+	world?: 'USER_SCRIPT' | 'MAIN';
+	worldId?: string;
+	injectImmediately?: boolean;
+}
+
 interface UserScriptsNamespace {
 	register(scripts: RegisteredUserScript[]): Promise<void>;
 	update(scripts: RegisteredUserScript[]): Promise<void>;
 	unregister(filter?: { ids?: string[] }): Promise<void>;
 	getScripts(filter?: { ids?: string[] }): Promise<RegisteredUserScript[]>;
+	execute(injection: UserScriptInjection): Promise<Array<{ error?: string }>>;
 	configureWorld(properties: WorldProperties): Promise<void>;
 	resetWorldConfiguration(worldId?: string): Promise<void>;
 }

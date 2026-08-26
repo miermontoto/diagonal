@@ -111,12 +111,40 @@ const runQuery = async (
 	return { code, sessionId };
 };
 
+// reanudar puede fallar si la sesión caducó o la limpiaron. el prompt siempre
+// lleva el contexto suficiente por sí solo, así que se reintenta sin memoria en
+// vez de tumbar la petición entera
+const runResumable = async (
+	build: (continuing: boolean) => string,
+	onChunk: (text: string) => void,
+	resume: string | undefined,
+	screenshot?: string,
+): Promise<{ code: string; sessionId?: string }> => {
+	let streamed = false;
+	const track = (text: string): void => {
+		streamed = true;
+		onChunk(text);
+	};
+
+	return runQuery(build(resume !== undefined), track, resume, screenshot).catch((error: unknown) => {
+		// con el stream ya abierto el fallo no es de la sesión: no hay nada que reintentar
+		if (!resume || streamed) throw error;
+		console.warn('[diagonal] sesión no reanudable, reintento sin memoria', error);
+		return runQuery(build(false), track, undefined, screenshot);
+	});
+};
+
 export const generateScript = async (
 	prompt: string,
 	context: PageContext,
 	onChunk: (text: string) => void,
+	resume?: string,
 ): Promise<DiagonalScript> => {
-	const { code, sessionId } = await runQuery(buildPrompt(prompt, context), onChunk);
+	const { code, sessionId } = await runResumable(
+		(continuing) => buildPrompt(prompt, context, continuing),
+		onChunk,
+		resume,
+	);
 	const meta = parseMetadata(code);
 	const now = new Date().toISOString();
 
@@ -125,6 +153,7 @@ export const generateScript = async (
 		name: meta.name ?? context.title,
 		description: meta.description ?? prompt,
 		matches: meta.matches.length > 0 ? meta.matches : [matchPatternFromUrl(context.url)],
+		verify: meta.verify,
 		code,
 		// los scripts nacen deshabilitados: solo se activan tras la revisión del usuario
 		enabled: false,
@@ -144,20 +173,11 @@ export const refineScript = async (
 	diagnostics?: ScriptDiagnostic[],
 	evidence?: PageEvidence,
 ): Promise<DiagonalScript> => {
-	const refinePrompt = buildRefinePrompt(prompt, script, context, diagnostics, evidence);
-	const screenshot = evidence?.screenshot;
-	let streamed = false;
-	const track = (text: string): void => {
-		streamed = true;
-		onChunk(text);
-	};
-
-	const { code, sessionId } = await runQuery(refinePrompt, track, script.sessionId, screenshot).catch((error: unknown) => {
-		// la sesión pudo caducar o borrarse; el prompt ya lleva el código completo,
-		// así que se reintenta sin memoria salvo que el fallo llegara con el stream ya abierto
-		if (!script.sessionId || streamed) throw error;
-		console.warn('[diagonal] sesión no reanudable, reintento sin memoria', error);
-		return runQuery(refinePrompt, track, undefined, screenshot);
-	});
+	const { code, sessionId } = await runResumable(
+		() => buildRefinePrompt(prompt, script, context, diagnostics, evidence),
+		onChunk,
+		script.sessionId,
+		evidence?.screenshot,
+	);
 	return { ...applyCode(script, code), sessionId: sessionId ?? script.sessionId };
 };

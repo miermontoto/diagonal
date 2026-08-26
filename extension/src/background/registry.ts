@@ -1,4 +1,4 @@
-import { MAX_DIAGNOSTICS_PER_SCRIPT, instrument, isValidMatchPattern, normalizeMatchPattern } from '@diagonal/shared';
+import { MAX_DIAGNOSTICS_PER_SCRIPT, instrument, isValidMatchPattern, matchesUrl, normalizeMatchPattern } from '@diagonal/shared';
 import type { DiagonalScript, DiagnosticKind, ScriptDiagnostic } from '@diagonal/shared';
 import { userScriptsApi } from './userscripts-api';
 import type { RegisteredUserScript } from './userscripts-api';
@@ -118,4 +118,38 @@ export const syncRegistrations = async (): Promise<void> => {
 			}),
 		);
 	}
+};
+
+// register() solo actúa en la siguiente navegación, así que sin esto activar o
+// desactivar un script no se nota hasta recargar la pestaña
+export const applyToOpenTabs = async (script: DiagonalScript): Promise<void> => {
+	const api = userScriptsApi();
+	if (!api) return;
+	const tabIds = (await browser.tabs.query({}))
+		.filter((tab) => tab.url && matchesUrl(script, tab.url))
+		.map((tab) => tab.id)
+		.filter((id): id is number => id !== undefined);
+
+	if (!script.enabled) {
+		// lo que el script ya tocó del dom no tiene deshacer genérico: recargar es
+		// la única forma honesta de dejar la página como si nunca hubiera corrido
+		await Promise.all(tabIds.map((tabId) => browser.tabs.reload(tabId)));
+		return;
+	}
+
+	await Promise.all(
+		tabIds.map(async (tabId) => {
+			try {
+				await api.execute({
+					js: [{ code: instrument(script) }],
+					target: { tabId },
+					world: 'USER_SCRIPT',
+					worldId: script.id,
+					injectImmediately: true,
+				});
+			} catch (error) {
+				console.warn('[diagonal] inyección inmediata fallida', tabId, error);
+			}
+		}),
+	);
 };

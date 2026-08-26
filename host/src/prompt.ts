@@ -32,11 +32,15 @@ const describeDiagnostic = (diagnostic: ScriptDiagnostic): string =>
 		.filter(Boolean)
 		.join('\n');
 
-export const buildPrompt = (prompt: string, context: PageContext): string =>
+export const buildPrompt = (prompt: string, context: PageContext, continuing = false): string =>
 	[
 		`Page URL: ${context.url}`,
 		`Page title: ${context.title}`,
 		context.digest ? `Page structure digest:\n${context.digest}` : '',
+		// sin esto el modelo confunde continuar la conversación con reescribir lo anterior
+		continuing
+			? 'This continues our earlier conversation, but it is a request for a SEPARATE NEW userscript. Use the earlier context to inform it, and do not return a script you already produced.'
+			: '',
 		`User request: ${prompt}`,
 	]
 		.filter(Boolean)

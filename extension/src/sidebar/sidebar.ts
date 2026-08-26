@@ -213,7 +213,10 @@ form.addEventListener('submit', (event) => {
 approveButton.addEventListener('click', () => {
 	if (detail?.mode !== 'proposal') return;
 	send({ type: 'ui:approve', scriptId: detail.script.id, code: detailCode.value });
-	closeDetail();
+	// aprobar no termina la conversación: el script sigue abierto, así el
+	// siguiente mensaje lo reformula en vez de empezar uno nuevo desde cero.
+	// descartar y cerrar sí la cierran, porque ahí el usuario ya ha terminado
+	openDetail({ ...detail.script, code: detailCode.value }, 'edit');
 });
 
 discardButton.addEventListener('click', () => {

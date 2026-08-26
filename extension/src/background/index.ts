@@ -5,6 +5,7 @@ import { captureContext, captureEvidence } from './capture';
 import { listenForScriptReports } from './diagnostics';
 import { onDisconnect, request, requestOne } from './native';
 import {
+	applyToOpenTabs,
 	clearDiagnostics,
 	loadDiagnostics,
 	loadRuns,
@@ -19,6 +20,9 @@ let auth: UiState['auth'] = 'unknown';
 let busy = false;
 // propuesta pendiente de revisión: no toca storage ni registro hasta aprobarse
 let pending: DiagonalScript | undefined;
+// sesión de claude del hilo abierto en la sidebar: sin esto cada mensaje
+// arrancaría de cero y la conversación no recordaría nada de lo anterior
+let conversation: string | undefined;
 
 const buildState = async (): Promise<UiState> => ({
 	scripts: await loadScripts(),
@@ -105,6 +109,7 @@ browser.runtime.onConnect.addListener((sidebar) => {
 			busy = false;
 			if (event.type === 'script') {
 				pending = event.script;
+				conversation = event.script.sessionId ?? conversation;
 				post({ type: 'ui:proposal', script: event.script });
 			} else if (event.type === 'error') {
 				post({ type: 'ui:error', message: event.message });
@@ -139,6 +144,9 @@ browser.runtime.onConnect.addListener((sidebar) => {
 
 		await requestOne({ id: crypto.randomUUID(), type: 'save', script });
 		await syncRegistrations();
+		// el registro solo alcanza a la próxima navegación: las pestañas abiertas
+		// se atienden aparte para que activar o desactivar se note al momento
+		await applyToOpenTabs(script);
 		await pushState();
 	};
 
@@ -149,7 +157,7 @@ browser.runtime.onConnect.addListener((sidebar) => {
 		},
 
 		'ui:generate': async ({ prompt }) =>
-			runGeneration((context) => ({ id: crypto.randomUUID(), type: 'generate', prompt, context })),
+			runGeneration((context) => ({ id: crypto.randomUUID(), type: 'generate', prompt, context, resume: conversation })),
 
 		'ui:refine': async ({ scriptId, prompt, code }) => {
 			// una propuesta encadena reprompts antes de aprobarse, así que también cuenta

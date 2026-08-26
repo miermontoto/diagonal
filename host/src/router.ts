@@ -27,8 +27,11 @@ export const handleRequest = async (request: HostRequest, emit: (event: HostEven
 				emit({ id, type: 'ok' });
 				return;
 			case 'generate': {
-				const script = await generateScript(request.prompt, request.context, (text) =>
-					emit({ id, type: 'chunk', text }),
+				const script = await generateScript(
+					request.prompt,
+					request.context,
+					(text) => emit({ id, type: 'chunk', text }),
+					request.resume,
 				);
 				emit({ id, type: 'script', script });
 				return;
